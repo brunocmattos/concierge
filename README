@@ -21,3 +21,11 @@ Docker · GitHub Actions (CI/CD) · Terraform · GCP (Cloud Run) · Prometheus/G
 
 ---
 *Part of my transition from infrastructure to Cloud/DevOps.*
+
+## Architecture
+```mermaid
+flowchart LR
+  U[User / Channel] --> S[Service API]
+  S --> A[AI Agent + RAG]
+  A --> KB[(Postgres + pgvector)]
+  A -->|low confidence| H[Human handoff]
