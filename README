@@ -1,0 +1,23 @@
+# 🤖 Concierge — AI Omnichannel Support Agent (WIP)
+
+> 🚧 Building in public. An AI customer-support agent with human handoff:
+> answers from a knowledge base and escalates to a human when it can't resolve.
+
+## The idea
+Ingest real support conversations → knowledge base (Postgres + pgvector) →
+an AI agent answers on the channel (chat first, then voice and email) and
+**hands off to a human** when confidence is low.
+
+## Planned stack
+PostgreSQL + pgvector · Python (FastAPI) · LLM + RAG · Whisper + Asterisk (voice) ·
+Docker · GitHub Actions (CI/CD) · Terraform · GCP (Cloud Run) · Prometheus/Grafana · GKE
+
+## Roadmap
+- [x] Repo + scaffold
+- [ ] M0 — local docker-compose (Postgres + pgvector + service + chat + RAG + handoff)
+- [ ] M1 — CI/CD pipeline
+- [ ] M2 — IaC + deploy to GCP
+- [ ] M3 — observability
+
+---
+*Part of my transition from infrastructure to Cloud/DevOps.*
