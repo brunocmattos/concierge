@@ -1,0 +1,16 @@
+# Concierge database: Postgres 16 with the pgvector extension
+services:
+  db:                                   # service name (and hostname on the compose network)
+    image: pgvector/pgvector:pg16       # Postgres 16 with pgvector already bundled
+    container_name: concierge-db
+    environment:                        # DEV credentials (move to secrets later, in M2)
+      POSTGRES_USER: concierge
+      POSTGRES_PASSWORD: concierge
+      POSTGRES_DB: concierge
+    ports:
+      - "5432:5432"                     # expose Postgres to your machine
+    volumes:
+      - pgdata:/var/lib/postgresql/data # persist data across container restarts
+
+volumes:
+  pgdata:                               # named volume, managed by Docker
