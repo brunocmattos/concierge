@@ -1,14 +1,17 @@
 # Build our own image for the Concierge API
 FROM python:3.12-slim
 
+# libgomp1 is needed by onnxruntime (the engine behind the embedding model)
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1
+
 WORKDIR /app
 
-# Install deps first so this layer is cached when only the code changes
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
+# Pre-download the embedding model INTO the image, so runtime is instant
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding()"
+
 COPY . .
 
-# 0.0.0.0 makes the API reachable from outside the container
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
