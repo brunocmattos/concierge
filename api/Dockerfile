@@ -1,16 +1,16 @@
-# Build our own image for the Concierge API
 FROM python:3.12-slim
 
-# libgomp1 is needed by onnxruntime (the engine behind the embedding model)
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1
 
 WORKDIR /app
 
+# Heavy + stable layer: embedding lib + model download (cached across code/dep changes)
+RUN pip install --no-cache-dir fastembed
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding()"
+
+# App dependencies (change more often than the model)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Pre-download the embedding model INTO the image, so runtime is instant
-RUN python -c "from fastembed import TextEmbedding; TextEmbedding()"
 
 COPY . .
 

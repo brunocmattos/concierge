@@ -1,4 +1,4 @@
-# Concierge stack: database (Postgres + pgvector) + API (FastAPI)
+# Concierge stack: database (Postgres + pgvector) + API (FastAPI + LLM)
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -13,8 +13,10 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   api:
-    build: ./api                        # build OUR image from ./api/Dockerfile
+    build: ./api
     container_name: concierge-api
+    env_file:
+      - .env                            # loads GROQ_API_KEY / GROQ_MODEL (gitignored)
     environment:
       DATABASE_URL: postgresql://concierge:concierge@db:5432/concierge
     ports:

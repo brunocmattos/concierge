@@ -2,13 +2,15 @@ import os
 import psycopg
 from fastapi import FastAPI
 from fastembed import TextEmbedding
+from groq import Groq
 
 app = FastAPI(title="Concierge API")
 DB_URL = os.environ.get("DATABASE_URL", "postgresql://concierge:concierge@db:5432/concierge")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+THRESHOLD = float(os.environ.get("SCORE_THRESHOLD", "0.6"))
 
-# Load the embedding model once. Default: BAAI/bge-small-en-v1.5 (384 dims).
-# For Portuguese in production, swap to a multilingual model later.
 embedder = TextEmbedding()
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
 
 def embed(text: str) -> str:
     vec = list(embedder.embed([text]))[0].tolist()
@@ -49,3 +51,33 @@ def search(q: str, k: int = 3):
         )
         rows = cur.fetchall()
     return {"query": q, "results": [{"content": c, "score": round(float(s), 3)} for c, s in rows]}
+
+@app.get("/chat")
+def chat(q: str):
+    qv = embed(q)
+    with psycopg.connect(DB_URL) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT content, 1 - (embedding <=> %s::vector) AS score "
+            "FROM knowledge ORDER BY embedding <=> %s::vector LIMIT 3;",
+            (qv, qv),
+        )
+        rows = cur.fetchall()
+    best = float(rows[0][1]) if rows else 0.0
+    # HANDOFF: low confidence -> do not guess, escalate to a human
+    if best < THRESHOLD:
+        return {"handoff": True, "best_score": round(best, 3),
+                "answer": "I'm not confident about this one - let me hand you to a human agent."}
+    context = "\n".join(f"- {c}" for c, s in rows)
+    prompt = ("Answer the question using ONLY the context. "
+              "If the context does not contain the answer, say you don't know.\n\n"
+              f"Context:\n{context}\n\nQuestion: {q}")
+    completion = groq_client.chat.completions.create(
+        model=GROQ_MODEL,
+        messages=[
+            {"role": "system", "content": "You are a concise, friendly support assistant."},
+            {"role": "user", "content": prompt},
+        ],
+    )
+    return {"handoff": False, "best_score": round(best, 3),
+            "answer": completion.choices[0].message.content,
+            "sources": [c for c, s in rows]}
