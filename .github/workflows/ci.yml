@@ -1,0 +1,20 @@
+name: CI                              # shows up in the repo's "Actions" tab
+
+on:                                   # WHEN the pipeline runs
+  push:                               # on every push
+  pull_request:                       # and on every pull request
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest            # GitHub spins up a fresh Ubuntu machine (a "runner")
+    steps:
+      - uses: actions/checkout@v4     # 1) pull your code onto the runner
+      - uses: actions/setup-python@v5 # 2) install Python
+        with:
+          python-version: "3.12"
+      - name: Lint (ruff)             # 3) static-check the code for errors
+        run: |
+          pip install ruff
+          ruff check api/
+      - name: Build Docker image      # 4) prove the Dockerfile still builds
+        run: docker build -t concierge-api ./api
