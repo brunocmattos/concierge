@@ -4,3 +4,8 @@
 # Python
 __pycache__/
 *.pyc
+
+# Terraform (state can hold secrets; .terraform/ is heavy cache)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
