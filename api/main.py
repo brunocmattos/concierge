@@ -1,20 +1,11 @@
 import os
 import psycopg
 from fastapi import FastAPI
-from fastembed import TextEmbedding
-from groq import Groq
 
 app = FastAPI(title="Concierge API")
 DB_URL = os.environ.get("DATABASE_URL", "postgresql://concierge:concierge@db:5432/concierge")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 THRESHOLD = float(os.environ.get("SCORE_THRESHOLD", "0.6"))
-
-embedder = TextEmbedding()
-groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
-
-def embed(text: str) -> str:
-    vec = list(embedder.embed([text]))[0].tolist()
-    return "[" + ",".join(str(x) for x in vec) + "]"
 
 SEED_DOCS = [
     "To reset your password, click 'Forgot password' on the login page.",
@@ -24,13 +15,32 @@ SEED_DOCS = [
     "To change your billing address, go to Settings > Billing > Address.",
 ]
 
+# Heavy deps load only when first used, so importing this module (for tests)
+# stays fast and needs neither the model download nor the API key.
+_embedder = None
+
+def get_embedder():
+    global _embedder
+    if _embedder is None:
+        from fastembed import TextEmbedding
+        _embedder = TextEmbedding()
+    return _embedder
+
+def embed(text: str) -> str:
+    vec = list(get_embedder().embed([text]))[0].tolist()
+    return "[" + ",".join(str(x) for x in vec) + "]"
+
+def llm():
+    from groq import Groq
+    return Groq(api_key=os.environ.get("GROQ_API_KEY", ""))
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "concierge"}
 
 @app.post("/seed")
 def seed():
-    dim = len(list(embedder.embed(["probe"]))[0])
+    dim = len(list(get_embedder().embed(["probe"]))[0])
     with psycopg.connect(DB_URL) as conn, conn.cursor() as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
         cur.execute("DROP TABLE IF EXISTS knowledge;")
@@ -63,7 +73,6 @@ def chat(q: str):
         )
         rows = cur.fetchall()
     best = float(rows[0][1]) if rows else 0.0
-    # HANDOFF: low confidence -> do not guess, escalate to a human
     if best < THRESHOLD:
         return {"handoff": True, "best_score": round(best, 3),
                 "answer": "I'm not confident about this one - let me hand you to a human agent."}
@@ -71,7 +80,7 @@ def chat(q: str):
     prompt = ("Answer the question using ONLY the context. "
               "If the context does not contain the answer, say you don't know.\n\n"
               f"Context:\n{context}\n\nQuestion: {q}")
-    completion = groq_client.chat.completions.create(
+    completion = llm().chat.completions.create(
         model=GROQ_MODEL,
         messages=[
             {"role": "system", "content": "You are a concise, friendly support assistant."},
